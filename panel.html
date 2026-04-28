@@ -183,7 +183,7 @@ function CajeroView({onLogout,session}){
   }
 
   useEffect(()=>{
-    q("jugadores?activo=eq.true&select=id,username,nombre&order=nombre").then(setJugadores).catch(()=>{});
+    q("jugadores?activo=eq.true&select=id,username,nombre,telefono&order=nombre").then(setJugadores).catch(()=>{});
     cargarResumen();
   },[]);
 
@@ -219,7 +219,30 @@ function CajeroView({onLogout,session}){
         {operacion_id:op.id,concepto:"bonificacion_categoria",valor:bonus,unidad:"fichas",detalle:`Bonificación ${pct*100}% nivel ${lvlName} → ${bonus.toLocaleString("es-AR")} fichas`},
       ])});
       await q(`puntos_jugador?jugador_id=eq.${pdata.id}`,{method:"PATCH",body:JSON.stringify({puntos:pdata.puntos+gen,fichas:pdata.fichas+bonus,updated_at:new Date().toISOString()})});
-      flash(`Carga OK. +${gen} pts · +${bonus.toLocaleString("es-AR")} fichas bonif. (${pct*100}% ${lvlName})`,true);
+      // Generar mensaje WhatsApp
+      const lvlActual=getLevel(pdata.puntos+gen);
+      const nextLvl=LEVEL_CONFIG.find(l=>l.min>pdata.puntos+gen);
+      const faltanNext=nextLvl?nextLvl.min-(pdata.puntos+gen):0;
+      const textoWa=
+`🎰 *RIO NEA* — Resumen de tu cuenta
+
+Hola ${pdata.nombre}! 👋
+
+✅ Se acreditaron *${monto.toLocaleString("es-AR")}* en tu cuenta.
+
+📊 *Tu situación actual:*
+• Puntos: *${pdata.puntos+gen} pts*
+• Fichas bonificación: *+${bonus.toLocaleString("es-AR")}*
+• Categoría: *${lvlActual.name}*
+${faltanNext>0?`• Te faltan *${faltanNext} pts* para subir a *${nextLvl.name}*`:`• ¡Estás en el nivel máximo VIP! 🏆`}
+
+💡 Recordá: cada punto vale $100 en fichas.
+
+¡Gracias por jugar en Rio Nea! 🌊`;
+      if(pdata.telefono) setWaMsg({texto:textoWa,tel:pdata.telefono,nombre:pdata.nombre});
+      else setWaMsg({texto:textoWa,tel:null,nombre:pdata.nombre});
+
+      flash(`Carga OK. +${gen} pts · +${bonus.toLocaleString("es-AR")} fichas bonif.`,true);
       setAmount(""); loadPlayer(pid); cargarResumen();
     }catch(e){flash("Error: "+e.message,false);}
     finally{setLoading(false);}
@@ -242,36 +265,41 @@ function CajeroView({onLogout,session}){
 
   // ── Estado nuevo jugador
   const [nuevoNombre,setNuevoNombre]=useState("");
-  const [nuevoUser,setNuevoUser]=useState("");
+  const [nuevoTel,setNuevoTel]=useState("");
   const [nuevoMsg,setNuevoMsg]=useState(null);
   const [nuevoLoading,setNuevoLoading]=useState(false);
 
+  // ── Mensaje WhatsApp post-carga
+  const [waMsg,setWaMsg]=useState(null);
+  const [waCopied,setWaCopied]=useState(false);
+
+  function generarUsername(nombre){
+    return nombre.trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/\s+/g,"").slice(0,12);
+  }
+
   async function handleNuevoJugador(){
     const nombre=nuevoNombre.trim();
-    const username=nuevoUser.trim().toLowerCase().replace(/\s+/g,"");
-    if(!nombre||!username)return setNuevoMsg({text:"Completá nombre y usuario.",ok:false});
-    setNuevoLoading(true);setNuevoMsg(null);
+    const tel=nuevoTel.trim().replace(/\D/g,"");
+    if(!nombre) return setNuevoMsg({text:"Ingresá el nombre del jugador.",ok:false});
+    const username=generarUsername(nombre)+"_"+Math.floor(Math.random()*900+100);
+    setNuevoLoading(true); setNuevoMsg(null);
     try{
-      // verificar que no exista
-      const existe=await q(`jugadores?username=eq.${encodeURIComponent(username)}&select=id`);
-      if(existe.length)return setNuevoMsg({text:"Ese usuario ya existe.",ok:false});
-      // crear jugador
-      const [jug]=await q("jugadores",{method:"POST",body:JSON.stringify({username,nombre,activo:true})});
-      // crear fila de puntos
+      const [jug]=await q("jugadores",{method:"POST",body:JSON.stringify({username,nombre,telefono:tel||null,activo:true})});
       await q("puntos_jugador",{method:"POST",body:JSON.stringify({jugador_id:jug.id,puntos:0,fichas:0})});
-      setNuevoMsg({text:`✓ Jugador "${nombre}" (@${username}) creado correctamente.`,ok:true});
-      setNuevoNombre("");setNuevoUser("");
-      // recargar lista
-      q("jugadores?activo=eq.true&select=id,username,nombre&order=nombre").then(setJugadores).catch(()=>{});
+      setNuevoMsg({text:`✓ "${nombre}" registrado. Usuario: @${username}`,ok:true});
+      setNuevoNombre(""); setNuevoTel("");
+      q("jugadores?activo=eq.true&select=id,username,nombre,telefono&order=nombre").then(setJugadores).catch(()=>{});
     }catch(e){setNuevoMsg({text:"Error: "+e.message,ok:false});}
     finally{setNuevoLoading(false);}
   }
 
-  function sugerirUsername(nombre){
-    const u=nombre.trim().toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-      .replace(/\s+/g,"").slice(0,10);
-    setNuevoUser(u);
+  function copyWaMsg(){
+    if(!waMsg) return;
+    navigator.clipboard.writeText(waMsg.texto).then(()=>{
+      setWaCopied(true); setTimeout(()=>setWaCopied(false),2500);
+    });
   }
   const bonusPrev=pdata&&amount?Math.floor(parseInt(amount||0)*(BONUS_PCT[getLevel(pdata.puntos).name]||0)):0;
   const fichasPrev=pts?parseInt(pts||0)*FICHAS_PER_PT:0;
@@ -395,6 +423,30 @@ function CajeroView({onLogout,session}){
         )}
         {tab!=="nuevo"&&msg&&<div style={{marginTop:12,padding:"8px 12px",borderRadius:8,background:msg.ok?"#EAF3DE":"#FCEBEB",color:msg.ok?"#173404":"#501313",fontSize:14,fontWeight:500}}>{msg.text}</div>}
       </div>
+
+      {/* MENSAJE WHATSAPP */}
+      {waMsg&&(
+        <div style={{marginTop:"1.25rem",background:"#fff",border:"1px solid #25D366",borderRadius:12,overflow:"hidden"}}>
+          <div style={{background:"#25D366",padding:"8px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{color:"#fff",fontWeight:600,fontSize:13}}>📱 Mensaje para {waMsg.nombre}</span>
+            <button onClick={()=>setWaMsg(null)} style={{background:"none",border:"none",color:"#fff",fontSize:16,cursor:"pointer",lineHeight:1}}>×</button>
+          </div>
+          <div style={{padding:"12px 14px"}}>
+            <pre style={{fontSize:12,color:"#333",whiteSpace:"pre-wrap",fontFamily:"inherit",lineHeight:1.6,marginBottom:10}}>{waMsg.texto}</pre>
+            <div style={{display:"flex",gap:8}}>
+              <button onClick={copyWaMsg} style={{flex:1,padding:"9px",background:waCopied?"#EAF3DE":"#E7FDE7",border:"1px solid #25D366",borderRadius:8,color:"#128C7E",fontWeight:600,fontSize:13,cursor:"pointer"}}>
+                {waCopied?"✓ ¡Copiado!":"📋 Copiar mensaje"}
+              </button>
+              {waMsg.tel&&(
+                <a href={`https://wa.me/${waMsg.tel}?text=${encodeURIComponent(waMsg.texto)}`} target="_blank" rel="noreferrer"
+                  style={{flex:1,padding:"9px",background:"#25D366",border:"1px solid #25D366",borderRadius:8,color:"#fff",fontWeight:600,fontSize:13,cursor:"pointer",textDecoration:"none",textAlign:"center",display:"block"}}>
+                  💬 Abrir en WhatsApp
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {movs&&(movs.ops?.length>0||movs.canjes?.length>0)&&(
         <div style={{marginTop:"1.25rem"}}>
