@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Rio Nea — Panel de Puntos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;background:#f5f5f3;color:#1a1a1a}
+  input,select,button{font-family:inherit;font-size:14px;outline:none}
+  input,select{width:100%;padding:8px 12px;border:1px solid #e0ddd6;border-radius:6px;background:#fff;color:#1a1a1a;transition:border-color .2s}
+  input:focus,select:focus{border-color:#c9a84c}
+  button{cursor:pointer}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect, useCallback } = React;
+
+const SUPA_URL = "https://grtmfhlcsfmvzmtrxugg.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydG1maGxjc2ZtdnptdHJ4dWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTg2MzgsImV4cCI6MjA5MDAzNDYzOH0.BInOLC0LRPGNRF4QqrExDwRbbJQZOHNtg3pFnq-hXdU";
+
+const LEVEL_CONFIG = [
+  { name:"Inicial", min:0,    max:499,      color:"#5F5E5A", bg:"#F1EFE8" },
+  { name:"Pro",     min:500,  max:1999,     color:"#185FA5", bg:"#E6F1FB" },
+  { name:"VIP",     min:2000, max:Infinity, color:"#854F0B", bg:"#FAEEDA" },
+];
+const PTS_PER_PESO  = 1000;
+const FICHAS_PER_PT = 100;
+const BONUS_PCT = { Inicial:0.05, Pro:0.10, VIP:0.15 };
+
+function getLevel(pts){ return LEVEL_CONFIG.find(l=>pts>=l.min&&pts<=l.max)||LEVEL_CONFIG[0]; }
+function getNext(pts){ const i=LEVEL_CONFIG.findIndex(l=>pts>=l.min&&pts<=l.max); return i<LEVEL_CONFIG.length-1?LEVEL_CONFIG[i+1]:null; }
+
+async function q(path,opts={}){
+  const r=await fetch(`${SUPA_URL}/rest/v1/${path}`,{
+    headers:{apikey:SUPA_KEY,Authorization:`Bearer ${SUPA_KEY}`,"Content-Type":"application/json",Prefer:"return=representation"},
+    ...opts
+  });
+  if(!r.ok) throw new Error(await r.text());
+  const t=await r.text(); return t?JSON.parse(t):[];
+}
+
+// ── ROOT ──────────────────────────────────────────────────────
+function App(){
+  const [session,setSession]=useState(null);
+  return session
+    ? session.role==="jugador"
+      ? <JugadorView session={session} onLogout={()=>setSession(null)}/>
+      : <CajeroView session={session} onLogout={()=>setSession(null)}/>
+    : <LoginView onLogin={setSession}/>;
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────
+function LoginView({onLogin}){
+  const [tab,setTab]=useState("jugador");
+  const [user,setUser]=useState("");
+  const [cUser,setCUser]=useState("");
+  const [pin,setPin]=useState("");
+  const [err,setErr]=useState("");
+  const [loading,setLoading]=useState(false);
+
+  async function handleJugador(e){
+    e.preventDefault();
+    if(!user.trim()) return setErr("Ingresá tu usuario.");
+    setLoading(true); setErr("");
+    try{
+      const rows=await q(`jugadores?username=eq.${encodeURIComponent(user.trim().toLowerCase())}&activo=eq.true&select=id,username,nombre`);
+      if(!rows.length) return setErr("Usuario no encontrado.");
+      const jugador=rows[0];
+      const pts=await q(`puntos_jugador?jugador_id=eq.${jugador.id}&select=puntos,fichas`);
+      onLogin({role:"jugador",jugador,puntos:pts[0]||{puntos:0,fichas:0}});
+    }catch{ setErr("Error de conexión."); }
+    finally{ setLoading(false); }
+  }
+
+  async function handleCajero(e){
+    e.preventDefault();
+    if(!cUser.trim()) return setErr("Ingresá tu usuario.");
+    if(!pin) return setErr("Ingresá tu PIN.");
+    setLoading(true); setErr("");
+    try{
+      const rows=await q(`usuarios_sistema?username=eq.${encodeURIComponent(cUser.trim().toLowerCase())}&activo=eq.true&select=id,nombre,pin,rol`);
+      if(!rows.length) return setErr("Usuario no encontrado.");
+      const u=rows[0];
+      if(u.pin!==pin) return setErr("PIN incorrecto.");
+      onLogin({role:u.rol==="admin"?"admin":"cajero",cajeroNombre:u.nombre});
+    }catch{ setErr("Error de conexión."); }
+    finally{ setLoading(false); }
+  }
+
+  const s=(active,col,bg,br)=>({
+    flex:1,padding:"9px 0",borderRadius:8,border:"1px solid",
+    borderColor:active?br:"#e0ddd6",
+    background:active?bg:"#fff",
+    color:active?col:"#888",
+    fontWeight:active?600:400,cursor:"pointer",fontSize:14
+  });
+
+  return(
+    <div style={{maxWidth:380,margin:"3rem auto",padding:"0 1rem"}}>
+      <div style={{textAlign:"center",marginBottom:"2rem"}}>
+        <div style={{fontFamily:"Georgia,serif",fontSize:"2rem",fontWeight:700,color:"#c9a84c",letterSpacing:4}}>RIO NEA</div>
+        <p style={{fontSize:13,color:"#888",marginTop:4}}>Sistema de Puntos</p>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:"1.25rem"}}>
+        <button onClick={()=>{setTab("jugador");setErr("");}} style={s(tab==="jugador","#185FA5","#E6F1FB","#85B7EB")}>Jugador</button>
+        <button onClick={()=>{setTab("cajero");setErr("");}} style={s(tab==="cajero","#0F6E56","#E1F5EE","#5DCAA5")}>Cajero / Admin</button>
+      </div>
+      <div style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:12,padding:"1.5rem"}}>
+        {tab==="jugador"?(
+          <form onSubmit={handleJugador} style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+            <div>
+              <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Nombre de usuario</label>
+              <input value={user} onChange={e=>setUser(e.target.value)} placeholder="ej: carlosm" autoComplete="off"/>
+            </div>
+            {err&&<div style={{fontSize:13,color:"#A32D2D"}}>{err}</div>}
+            <button type="submit" disabled={loading} style={{padding:"10px",background:"#E6F1FB",border:"1px solid #85B7EB",borderRadius:8,color:"#0C447C",fontWeight:600,fontSize:15}}>
+              {loading?"Buscando...":"Ingresar"}
+            </button>
+          </form>
+        ):(
+          <form onSubmit={handleCajero} style={{display:"flex",flexDirection:"column",gap:"1rem"}}>
+            <div>
+              <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Usuario</label>
+              <input value={cUser} onChange={e=>setCUser(e.target.value)} placeholder="ej: cajero1" autoComplete="off"/>
+            </div>
+            <div>
+              <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>PIN</label>
+              <input type="password" value={pin} onChange={e=>setPin(e.target.value)} placeholder="••••"/>
+            </div>
+            {err&&<div style={{fontSize:13,color:"#A32D2D"}}>{err}</div>}
+            <button type="submit" disabled={loading} style={{padding:"10px",background:"#E1F5EE",border:"1px solid #5DCAA5",borderRadius:8,color:"#085041",fontWeight:600,fontSize:15}}>
+              {loading?"Verificando...":"Acceder al panel"}
+            </button>
+          </form>
+        )}
+      </div>
+      <p style={{textAlign:"center",fontSize:12,color:"#aaa",marginTop:12}}>Jugadores: carlosm · laurag · martins</p>
+    </div>
+  );
+}
+
+// ── CAJERO ────────────────────────────────────────────────────
+function CajeroView({onLogout,session}){
+  const cajeroRef=session.cajeroNombre;
+  const [tab,setTab]=useState("load");
+  const [jugadores,setJugadores]=useState([]);
+  const [pid,setPid]=useState("");
+  const [pdata,setPdata]=useState(null);
+  const [amount,setAmount]=useState("");
+  const [pts,setPts]=useState("");
+  const [movs,setMovs]=useState(null);
+  const [resumen,setResumen]=useState(null);
+  const [detalle,setDetalle]=useState([]);
+  const [msg,setMsg]=useState(null);
+  const [loading,setLoading]=useState(false);
+
+  function turnoActual(){
+    const h=new Date().getHours()*60+new Date().getMinutes();
+    if(h<=360)return 1; if(h<=720)return 2; if(h<=1080)return 3; return 4;
+  }
+  const turno=turnoActual();
+  const hoy=new Date().toISOString().slice(0,10);
+  const TURNO_LABELS=["","00:00–06:00","06:01–12:00","12:01–18:00","18:01–00:00"];
+
+  async function cargarResumen(){
+    try{
+      const [res,det,cnj]=await Promise.all([
+        q(`resumen_turno_cajero?cajero_ref=eq.${encodeURIComponent(cajeroRef)}&fecha=eq.${hoy}&numero_turno=eq.${turno}&select=*`),
+        q(`detalle_bonificacion_turno?cajero_ref=eq.${encodeURIComponent(cajeroRef)}&fecha=eq.${hoy}&numero_turno=eq.${turno}&select=jugador,username,monto_pesos,fichas_bonificacion,detalle,created_at`),
+        q(`canjes_turno?fecha=eq.${hoy}&numero_turno=eq.${turno}&select=jugador,puntos_canjeados,fichas_acreditadas,created_at`)
+      ]);
+      setResumen({...(res[0]||{}),fichas_canje:cnj.reduce((a,c)=>a+(c.fichas_acreditadas||0),0),cant_canjes:cnj.length});
+      setDetalle(det);
+    }catch{}
+  }
+
+  useEffect(()=>{
+    q("jugadores?activo=eq.true&select=id,username,nombre&order=nombre").then(setJugadores).catch(()=>{});
+    cargarResumen();
+  },[]);
+
+  async function loadPlayer(id){
+    if(!id){setPdata(null);setMovs(null);return;}
+    const [p,ops,cnj]=await Promise.all([
+      q(`puntos_jugador?jugador_id=eq.${id}&select=puntos,fichas`),
+      q(`operaciones_carga?jugador_id=eq.${id}&select=id,monto_pesos,created_at,conceptos_operacion(concepto,valor,unidad,detalle)&order=created_at.desc&limit=4`),
+      q(`movimientos_puntos?jugador_id=eq.${id}&tipo=eq.canje&select=*&order=created_at.desc&limit=3`)
+    ]);
+    const jug=jugadores.find(j=>j.id===id);
+    setPdata({...jug,...(p[0]||{puntos:0,fichas:0})});
+    setMovs({ops,canjes:cnj});
+  }
+  useEffect(()=>{if(pid)loadPlayer(pid);else{setPdata(null);setMovs(null);}},[pid]);
+
+  function flash(t,ok){setMsg({text:t,ok});setTimeout(()=>setMsg(null),3500);}
+
+  async function handleLoad(){
+    const monto=parseInt(amount);
+    if(!pdata||!monto||monto<=0)return flash("Completá los campos.",false);
+    const gen=Math.floor(monto/PTS_PER_PESO);
+    if(gen===0)return flash("El monto mínimo es $1.000.",false);
+    const lvlName=getLevel(pdata.puntos).name;
+    const pct=BONUS_PCT[lvlName]||0;
+    const bonus=Math.floor(monto*pct);
+    setLoading(true);
+    try{
+      const [op]=await q("operaciones_carga",{method:"POST",body:JSON.stringify({jugador_id:pdata.id,monto_pesos:monto,cajero_ref:cajeroRef})});
+      await q("conceptos_operacion",{method:"POST",body:JSON.stringify([
+        {operacion_id:op.id,concepto:"dinero_real",valor:monto,unidad:"pesos",detalle:`Carga de $${monto.toLocaleString("es-AR")} pesos reales`},
+        {operacion_id:op.id,concepto:"puntos_generados",valor:gen,unidad:"puntos",detalle:`${gen} punto${gen!==1?"s":""} (1 cada $${PTS_PER_PESO.toLocaleString("es-AR")})`},
+        {operacion_id:op.id,concepto:"bonificacion_categoria",valor:bonus,unidad:"fichas",detalle:`Bonificación ${pct*100}% nivel ${lvlName} → ${bonus.toLocaleString("es-AR")} fichas`},
+      ])});
+      await q(`puntos_jugador?jugador_id=eq.${pdata.id}`,{method:"PATCH",body:JSON.stringify({puntos:pdata.puntos+gen,fichas:pdata.fichas+bonus,updated_at:new Date().toISOString()})});
+      flash(`Carga OK. +${gen} pts · +${bonus.toLocaleString("es-AR")} fichas bonif. (${pct*100}% ${lvlName})`,true);
+      setAmount(""); loadPlayer(pid); cargarResumen();
+    }catch(e){flash("Error: "+e.message,false);}
+    finally{setLoading(false);}
+  }
+
+  async function handleRedeem(){
+    const p=parseInt(pts);
+    if(!pdata||!p||p<=0)return flash("Completá los campos.",false);
+    if(p>pdata.puntos)return flash(`Puntos insuficientes. Tiene ${pdata.puntos} pts.`,false);
+    const fichas=p*FICHAS_PER_PT;
+    setLoading(true);
+    try{
+      await q(`puntos_jugador?jugador_id=eq.${pdata.id}`,{method:"PATCH",body:JSON.stringify({puntos:pdata.puntos-p,fichas:pdata.fichas+fichas,updated_at:new Date().toISOString()})});
+      await q("movimientos_puntos",{method:"POST",body:JSON.stringify({jugador_id:pdata.id,tipo:"canje",puntos_canjeados:p,fichas_acreditadas:fichas,descripcion:`Canje ${p} pts → ${fichas.toLocaleString("es-AR")} fichas`})});
+      flash(`Canje OK. ${fichas.toLocaleString("es-AR")} fichas a ${pdata.nombre}.`,true);
+      setPts(""); loadPlayer(pid); cargarResumen();
+    }catch{flash("Error al guardar.",false);}
+    finally{setLoading(false);}
+  }
+
+  const ptsPrev=amount?Math.floor(parseInt(amount||0)/PTS_PER_PESO):0;
+  const bonusPrev=pdata&&amount?Math.floor(parseInt(amount||0)*(BONUS_PCT[getLevel(pdata.puntos).name]||0)):0;
+  const fichasPrev=pts?parseInt(pts||0)*FICHAS_PER_PT:0;
+
+  const CONCEPTO_CFG={
+    dinero_real:{label:"Dinero cargado",color:"#185FA5",bg:"#E6F1FB"},
+    puntos_generados:{label:"Puntos generados",color:"#0F6E56",bg:"#E1F5EE"},
+    bonificacion_categoria:{label:"Bonificación fichas",color:"#854F0B",bg:"#FAEEDA"},
+  };
+
+  return(
+    <div style={{maxWidth:580,margin:"0 auto",padding:"1.5rem 1rem"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}>
+        <div>
+          <div style={{fontFamily:"Georgia,serif",fontSize:"1.2rem",fontWeight:700,color:"#c9a84c",letterSpacing:2}}>RIO NEA</div>
+          <div style={{fontSize:13,fontWeight:500}}>Panel Cajero — {cajeroRef}</div>
+          <div style={{fontSize:11,color:"#888"}}>Turno {turno} · {TURNO_LABELS[turno]}</div>
+        </div>
+        <button onClick={onLogout} style={{fontSize:13,color:"#888",background:"none",border:"1px solid #e0ddd6",borderRadius:6,padding:"5px 12px"}}>Salir</button>
+      </div>
+
+      {resumen&&(
+        <div style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:12,padding:"1.25rem",marginBottom:"1.25rem"}}>
+          <p style={{fontSize:12,fontWeight:500,color:"#888",marginBottom:10,textTransform:"uppercase",letterSpacing:1}}>Resumen del turno</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:10}}>
+            {[["Dinero cargado",`$${(resumen.dinero_cargado||0).toLocaleString("es-AR")}`,  "#185FA5","#E6F1FB"],
+              ["Puntos generados",(resumen.puntos_generados||0).toLocaleString("es-AR"),      "#0F6E56","#E1F5EE"],
+              ["Operaciones",     resumen.operaciones||0,                                      "#5F5E5A","#F1EFE8"],
+            ].map(([lbl,val,col,bg])=>(
+              <div key={lbl} style={{background:bg,borderRadius:8,padding:"8px 10px"}}>
+                <div style={{fontSize:11,color:col}}>{lbl}</div>
+                <div style={{fontSize:17,fontWeight:600,color:col}}>{val}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+            <div style={{background:"#FAEEDA",borderRadius:8,padding:"8px 10px"}}>
+              <div style={{fontSize:11,color:"#854F0B"}}>Bonificación total</div>
+              <div style={{fontSize:17,fontWeight:600,color:"#854F0B"}}>{(resumen.fichas_bonificacion_total||0).toLocaleString("es-AR")} fichas</div>
+            </div>
+            <div style={{background:"#F1EFE8",borderRadius:8,padding:"8px 10px"}}>
+              <div style={{fontSize:11,color:"#5F5E5A"}}>Fichas por canje</div>
+              <div style={{fontSize:17,fontWeight:600,color:"#5F5E5A"}}>{(resumen.fichas_canje||0).toLocaleString("es-AR")} fichas</div>
+            </div>
+          </div>
+          <div style={{borderTop:"1px solid #e0ddd6",paddingTop:10}}>
+            <p style={{fontSize:11,color:"#888",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Bonificación por nivel</p>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
+              {[["Inicial",resumen.bonif_inicial||0,"#5F5E5A","#F1EFE8"],["Pro",resumen.bonif_pro||0,"#185FA5","#E6F1FB"],["VIP",resumen.bonif_vip||0,"#854F0B","#FAEEDA"]].map(([lbl,val,col,bg])=>(
+                <div key={lbl} style={{background:bg,borderRadius:6,padding:"6px 8px"}}>
+                  <div style={{fontSize:11,color:col}}>{lbl}</div>
+                  <div style={{fontSize:14,fontWeight:600,color:col}}>{val.toLocaleString("es-AR")}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {detalle.length>0&&(
+            <div style={{borderTop:"1px solid #e0ddd6",paddingTop:10,marginTop:10}}>
+              <p style={{fontSize:11,color:"#888",marginBottom:6,textTransform:"uppercase",letterSpacing:1}}>Jugadores bonificados este turno</p>
+              {detalle.map((d,i)=>(
+                <div key={i} style={{display:"flex",justifyContent:"space-between",fontSize:12,padding:"4px 0",borderBottom:i<detalle.length-1?"1px solid #f0ede6":"none"}}>
+                  <span>{d.jugador} <span style={{color:"#aaa"}}>@{d.username}</span></span>
+                  <span style={{color:"#854F0B",fontWeight:500}}>+{parseInt(d.fichas_bonificacion).toLocaleString("es-AR")} fichas</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:"1.25rem"}}>
+        {[["load","Cargar dinero","#0F6E56","#E1F5EE","#5DCAA5"],["redeem","Canjear puntos","#854F0B","#FAEEDA","#EF9F27"]].map(([t,label,col,bg,br])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{padding:"9px 0",borderRadius:8,border:"1px solid",borderColor:tab===t?br:"#e0ddd6",background:tab===t?bg:"#fff",color:tab===t?col:"#888",fontWeight:tab===t?600:400,fontSize:14}}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:12,padding:"1.25rem"}}>
+        <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4,textTransform:"uppercase",letterSpacing:1}}>Jugador</label>
+        <select value={pid} onChange={e=>setPid(e.target.value)} style={{marginBottom:"1rem"}}>
+          <option value="">— Elegí un jugador —</option>
+          {jugadores.map(j=><option key={j.id} value={j.id}>{j.nombre} (@{j.username})</option>)}
+        </select>
+
+        {pdata&&(
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:"1rem"}}>
+            {[["Puntos",pdata.puntos],["Fichas",pdata.fichas.toLocaleString("es-AR")],["Nivel",getLevel(pdata.puntos).name]].map(([lbl,val])=>(
+              <div key={lbl} style={{background:"#f5f5f3",borderRadius:8,padding:"8px 10px"}}>
+                <div style={{fontSize:11,color:"#888"}}>{lbl}</div>
+                <div style={{fontSize:16,fontWeight:600,color:lbl==="Nivel"?getLevel(pdata.puntos).color:"#1a1a1a"}}>{val}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab==="load"?(
+          <>
+            <div style={{fontSize:11,color:"#854F0B",marginBottom:6}}>Bonif: Inicial 5% · Pro 10% · VIP 15%</div>
+            <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4}}>Monto a cargar ($)</label>
+            <input type="number" min="0" placeholder="ej: 5000" value={amount} onChange={e=>setAmount(e.target.value)} style={{marginBottom:8}}/>
+            {ptsPrev>0&&(
+              <div style={{fontSize:13,color:"#0F6E56",marginBottom:12,padding:"8px 10px",background:"#E1F5EE",borderRadius:6}}>
+                <div>+{ptsPrev} puntos</div>
+                {bonusPrev>0&&<div style={{color:"#854F0B",marginTop:2}}>+{bonusPrev.toLocaleString("es-AR")} fichas bonificación</div>}
+              </div>
+            )}
+            <button onClick={handleLoad} disabled={loading} style={{width:"100%",padding:"10px",background:"#E1F5EE",border:"1px solid #5DCAA5",borderRadius:8,color:"#085041",fontWeight:600,fontSize:15}}>
+              {loading?"Guardando...":"Confirmar carga"}
+            </button>
+          </>
+        ):(
+          <>
+            <label style={{fontSize:12,color:"#888",display:"block",marginBottom:4}}>Puntos a canjear</label>
+            <input type="number" min="0" placeholder="ej: 10" value={pts} onChange={e=>setPts(e.target.value)} style={{marginBottom:8}}/>
+            {fichasPrev>0&&<div style={{fontSize:13,color:"#854F0B",marginBottom:12,padding:"6px 10px",background:"#FAEEDA",borderRadius:6}}>Se acreditarán {fichasPrev.toLocaleString("es-AR")} fichas</div>}
+            <button onClick={handleRedeem} disabled={loading} style={{width:"100%",padding:"10px",background:"#FAEEDA",border:"1px solid #EF9F27",borderRadius:8,color:"#633806",fontWeight:600,fontSize:15}}>
+              {loading?"Guardando...":"Confirmar canje"}
+            </button>
+          </>
+        )}
+        {msg&&<div style={{marginTop:12,padding:"8px 12px",borderRadius:8,background:msg.ok?"#EAF3DE":"#FCEBEB",color:msg.ok?"#173404":"#501313",fontSize:14,fontWeight:500}}>{msg.text}</div>}
+      </div>
+
+      {movs&&(movs.ops?.length>0||movs.canjes?.length>0)&&(
+        <div style={{marginTop:"1.25rem"}}>
+          <p style={{fontSize:12,color:"#888",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Últimos movimientos del jugador</p>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {movs.ops.map(op=>(
+              <div key={op.id} style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:10,overflow:"hidden"}}>
+                <div style={{padding:"7px 12px",borderBottom:"1px solid #f0ede6",display:"flex",justifyContent:"space-between",fontSize:12}}>
+                  <span style={{color:"#888"}}>Carga · {new Date(op.created_at).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}</span>
+                  <span style={{color:"#888"}}>${parseInt(op.monto_pesos).toLocaleString("es-AR")}</span>
+                </div>
+                {(op.conceptos_operacion||[]).map((c,i)=>{
+                  const cfg=CONCEPTO_CFG[c.concepto]||{label:c.concepto,color:"#888",bg:"#eee"};
+                  return(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 12px",borderBottom:i<op.conceptos_operacion.length-1?"1px solid #f0ede6":"none"}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8}}>
+                        <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:cfg.bg,color:cfg.color,fontWeight:500}}>{cfg.label}</span>
+                        <span style={{fontSize:11,color:"#aaa"}}>{c.detalle}</span>
+                      </div>
+                      <span style={{fontSize:12,fontWeight:600,color:cfg.color}}>{parseInt(c.valor).toLocaleString("es-AR")} {c.unidad}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {movs.canjes.map(m=>(
+              <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#fff",border:"1px solid #e0ddd6",borderRadius:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500}}>Canje de puntos</div>
+                  <div style={{fontSize:11,color:"#aaa"}}>{m.descripcion} · {new Date(m.created_at).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}</div>
+                </div>
+                <span style={{fontSize:13,fontWeight:600,color:"#BA7517"}}>-{m.puntos_canjeados} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── JUGADOR ───────────────────────────────────────────────────
+function JugadorView({session,onLogout}){
+  const {jugador}=session;
+  const [pdata,setPdata]=useState(session.puntos);
+  const [movs,setMovs]=useState(null);
+  const [redeemPts,setRedeemPts]=useState("");
+  const [msg,setMsg]=useState(null);
+  const [loading,setLoading]=useState(false);
+
+  async function refresh(){
+    const [pts,ops,cnj]=await Promise.all([
+      q(`puntos_jugador?jugador_id=eq.${jugador.id}&select=puntos,fichas`),
+      q(`operaciones_carga?jugador_id=eq.${jugador.id}&select=id,monto_pesos,created_at,conceptos_operacion(concepto,valor,unidad,detalle)&order=created_at.desc&limit=5`),
+      q(`movimientos_puntos?jugador_id=eq.${jugador.id}&tipo=eq.canje&select=*&order=created_at.desc&limit=4`)
+    ]);
+    if(pts[0])setPdata(pts[0]);
+    setMovs({ops,canjes:cnj});
+  }
+  useEffect(()=>{refresh();},[]);
+
+  function flash(t,ok){setMsg({text:t,ok});setTimeout(()=>setMsg(null),3500);}
+
+  async function handleRedeem(){
+    const p=parseInt(redeemPts);
+    if(!p||p<=0)return;
+    if(p>pdata.puntos)return flash("No tenés suficientes puntos.",false);
+    const fichas=p*FICHAS_PER_PT;
+    setLoading(true);
+    try{
+      await q(`puntos_jugador?jugador_id=eq.${jugador.id}`,{method:"PATCH",body:JSON.stringify({puntos:pdata.puntos-p,fichas:pdata.fichas+fichas,updated_at:new Date().toISOString()})});
+      await q("movimientos_puntos",{method:"POST",body:JSON.stringify({jugador_id:jugador.id,tipo:"canje",puntos_canjeados:p,fichas_acreditadas:fichas,descripcion:`Canje ${p} pts → ${fichas.toLocaleString("es-AR")} fichas`})});
+      flash(`¡Canje exitoso! Recibiste ${fichas.toLocaleString("es-AR")} fichas.`,true);
+      setRedeemPts(""); refresh();
+    }catch{flash("Error al canjear.",false);}
+    finally{setLoading(false);}
+  }
+
+  const lvl=getLevel(pdata.puntos);
+  const next=getNext(pdata.puntos);
+  const toNext=next?next.min-pdata.puntos:0;
+  const progress=next?Math.round(((pdata.puntos-lvl.min)/(next.min-lvl.min))*100):100;
+  const initials=jugador.nombre.split(" ").map(w=>w[0]).join("").slice(0,2).toUpperCase();
+
+  const CONCEPTO_CFG={
+    dinero_real:{label:"Dinero cargado",color:"#185FA5",bg:"#E6F1FB"},
+    puntos_generados:{label:"Puntos generados",color:"#0F6E56",bg:"#E1F5EE"},
+    bonificacion_categoria:{label:"Bonificación fichas",color:"#854F0B",bg:"#FAEEDA"},
+  };
+
+  return(
+    <div style={{maxWidth:480,margin:"0 auto",padding:"1.5rem 1rem"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:"1.25rem"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:40,height:40,borderRadius:"50%",background:lvl.bg,display:"flex",alignItems:"center",justifyContent:"center",fontWeight:600,fontSize:13,color:lvl.color}}>{initials}</div>
+          <div>
+            <div style={{fontWeight:500,fontSize:15}}>{jugador.nombre}</div>
+            <div style={{fontSize:12,color:"#888"}}>@{jugador.username}</div>
+          </div>
+        </div>
+        <button onClick={onLogout} style={{fontSize:13,color:"#888",background:"none",border:"1px solid #e0ddd6",borderRadius:6,padding:"5px 12px"}}>Salir</button>
+      </div>
+
+      <div style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:12,padding:"1.25rem",marginBottom:"1rem"}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:"1rem"}}>
+          <div style={{background:"#f5f5f3",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:11,color:"#888"}}>Puntos</div>
+            <div style={{fontSize:22,fontWeight:600}}>{pdata.puntos}</div>
+          </div>
+          <div style={{background:"#f5f5f3",borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:11,color:"#888"}}>Fichas</div>
+            <div style={{fontSize:22,fontWeight:600}}>{pdata.fichas.toLocaleString("es-AR")}</div>
+          </div>
+          <div style={{background:lvl.bg,borderRadius:8,padding:"10px 12px"}}>
+            <div style={{fontSize:11,color:lvl.color}}>Nivel</div>
+            <div style={{fontSize:16,fontWeight:600,color:lvl.color}}>{lvl.name}</div>
+          </div>
+        </div>
+        <div style={{marginBottom:"1rem",padding:"8px 10px",background:"#FAEEDA",borderRadius:8,fontSize:13,color:"#633806"}}>
+          Tus {pdata.puntos} pts valen ${(pdata.puntos*FICHAS_PER_PT).toLocaleString("es-AR")} en fichas
+        </div>
+        {next?(
+          <>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#888",marginBottom:4}}>
+              <span>{lvl.name}</span><span>Faltan {toNext} pts para {next.name}</span>
+            </div>
+            <div style={{height:6,background:"#f0ede6",borderRadius:4,overflow:"hidden"}}>
+              <div style={{height:"100%",width:`${progress}%`,background:lvl.color,borderRadius:4,transition:"width .4s"}}/>
+            </div>
+          </>
+        ):(
+          <div style={{fontSize:13,color:"#854F0B",textAlign:"center",padding:"6px",background:"#FAEEDA",borderRadius:8}}>¡Nivel VIP — máximo alcanzado!</div>
+        )}
+      </div>
+
+      <div style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:12,padding:"1.25rem",marginBottom:"1rem"}}>
+        <p style={{margin:"0 0 4px",fontSize:14,fontWeight:500}}>Canjear puntos por fichas</p>
+        <p style={{margin:"0 0 10px",fontSize:12,color:"#888"}}>1 punto = ${FICHAS_PER_PT} en fichas · Disponibles: {pdata.puntos} pts</p>
+        <div style={{display:"flex",gap:8}}>
+          <input type="number" min="1" max={pdata.puntos} placeholder="Puntos a canjear" value={redeemPts} onChange={e=>setRedeemPts(e.target.value)}/>
+          <button onClick={handleRedeem} disabled={loading} style={{padding:"0 16px",background:"#FAEEDA",border:"1px solid #EF9F27",borderRadius:8,color:"#633806",fontWeight:600,fontSize:14,whiteSpace:"nowrap"}}>
+            {loading?"...":"Canjear"}
+          </button>
+        </div>
+        {redeemPts>0&&parseInt(redeemPts)<=pdata.puntos&&(
+          <div style={{marginTop:8,fontSize:13,color:"#0F6E56"}}>Recibirás {(parseInt(redeemPts)*FICHAS_PER_PT).toLocaleString("es-AR")} fichas</div>
+        )}
+        {msg&&<div style={{marginTop:10,padding:"8px 12px",borderRadius:8,background:msg.ok?"#EAF3DE":"#FCEBEB",color:msg.ok?"#173404":"#501313",fontSize:14,fontWeight:500}}>{msg.text}</div>}
+      </div>
+
+      {movs&&(movs.ops?.length>0||movs.canjes?.length>0)&&(
+        <div>
+          <p style={{fontSize:12,color:"#888",marginBottom:8,textTransform:"uppercase",letterSpacing:1}}>Historial de movimientos</p>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            {movs.ops.map(op=>(
+              <div key={op.id} style={{background:"#fff",border:"1px solid #e0ddd6",borderRadius:10,overflow:"hidden"}}>
+                <div style={{padding:"7px 12px",borderBottom:"1px solid #f0ede6",display:"flex",justifyContent:"space-between",fontSize:12,color:"#888"}}>
+                  <span>Carga · {new Date(op.created_at).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}</span>
+                  <span>${parseInt(op.monto_pesos).toLocaleString("es-AR")}</span>
+                </div>
+                {(op.conceptos_operacion||[]).map((c,i)=>{
+                  const cfg=CONCEPTO_CFG[c.concepto]||{label:c.concepto,color:"#888",bg:"#eee"};
+                  return(
+                    <div key={i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 12px",borderBottom:i<op.conceptos_operacion.length-1?"1px solid #f0ede6":"none"}}>
+                      <span style={{fontSize:11,padding:"2px 7px",borderRadius:20,background:cfg.bg,color:cfg.color,fontWeight:500}}>{cfg.label}</span>
+                      <span style={{fontSize:12,fontWeight:600,color:cfg.color}}>{parseInt(c.valor).toLocaleString("es-AR")} {c.unidad}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+            {movs.canjes.map(m=>(
+              <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 12px",background:"#fff",border:"1px solid #e0ddd6",borderRadius:8}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:500}}>Canje de puntos</div>
+                  <div style={{fontSize:11,color:"#aaa"}}>{m.descripcion} · {new Date(m.created_at).toLocaleString("es-AR",{dateStyle:"short",timeStyle:"short"})}</div>
+                </div>
+                <span style={{fontSize:13,fontWeight:600,color:"#BA7517"}}>-{m.puntos_canjeados} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
