@@ -148,7 +148,7 @@ function LoginView({onLogin}){
 // ── CAJERO ────────────────────────────────────────────────────
 function CajeroView({onLogout,session}){
   const cajeroRef=session.cajeroNombre;
-  const [tab,setTab]=useState("load");
+  const [tab,setTab]=useState("nuevo");
   const [jugadores,setJugadores]=useState([]);
   const [pid,setPid]=useState("");
   const [pdata,setPdata]=useState(null);
@@ -238,7 +238,39 @@ function CajeroView({onLogout,session}){
     finally{setLoading(false);}
   }
 
-  const ptsPrev=amount?Math.floor(parseInt(amount||0)/PTS_PER_PESO):0;
+  // ── Estado nuevo jugador
+  const [nuevoNombre,setNuevoNombre]=useState("");
+  const [nuevoUser,setNuevoUser]=useState("");
+  const [nuevoMsg,setNuevoMsg]=useState(null);
+  const [nuevoLoading,setNuevoLoading]=useState(false);
+
+  async function handleNuevoJugador(){
+    const nombre=nuevoNombre.trim();
+    const username=nuevoUser.trim().toLowerCase().replace(/\s+/g,"");
+    if(!nombre||!username)return setNuevoMsg({text:"Completá nombre y usuario.",ok:false});
+    setNuevoLoading(true);setNuevoMsg(null);
+    try{
+      // verificar que no exista
+      const existe=await q(`jugadores?username=eq.${encodeURIComponent(username)}&select=id`);
+      if(existe.length)return setNuevoMsg({text:"Ese usuario ya existe.",ok:false});
+      // crear jugador
+      const [jug]=await q("jugadores",{method:"POST",body:JSON.stringify({username,nombre,activo:true})});
+      // crear fila de puntos
+      await q("puntos_jugador",{method:"POST",body:JSON.stringify({jugador_id:jug.id,puntos:0,fichas:0})});
+      setNuevoMsg({text:`✓ Jugador "${nombre}" (@${username}) creado correctamente.`,ok:true});
+      setNuevoNombre("");setNuevoUser("");
+      // recargar lista
+      q("jugadores?activo=eq.true&select=id,username,nombre&order=nombre").then(setJugadores).catch(()=>{});
+    }catch(e){setNuevoMsg({text:"Error: "+e.message,ok:false});}
+    finally{setNuevoLoading(false);}
+  }
+
+  function sugerirUsername(nombre){
+    const u=nombre.trim().toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+      .replace(/\s+/g,"").slice(0,10);
+    setNuevoUser(u);
+  }
   const bonusPrev=pdata&&amount?Math.floor(parseInt(amount||0)*(BONUS_PCT[getLevel(pdata.puntos).name]||0)):0;
   const fichasPrev=pts?parseInt(pts||0)*FICHAS_PER_PT:0;
 
@@ -308,9 +340,9 @@ function CajeroView({onLogout,session}){
         </div>
       )}
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:"1.25rem"}}>
-        {[["load","Cargar dinero","#0F6E56","#E1F5EE","#5DCAA5"],["redeem","Canjear puntos","#854F0B","#FAEEDA","#EF9F27"]].map(([t,label,col,bg,br])=>(
-          <button key={t} onClick={()=>setTab(t)} style={{padding:"9px 0",borderRadius:8,border:"1px solid",borderColor:tab===t?br:"#e0ddd6",background:tab===t?bg:"#fff",color:tab===t?col:"#888",fontWeight:tab===t?600:400,fontSize:14}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:8,marginBottom:"1.25rem"}}>
+        {[["nuevo","Nuevo jugador","#185FA5","#E6F1FB","#85B7EB"],["load","Cargar dinero","#0F6E56","#E1F5EE","#5DCAA5"],["redeem","Canjear puntos","#854F0B","#FAEEDA","#EF9F27"]].map(([t,label,col,bg,br])=>(
+          <button key={t} onClick={()=>setTab(t)} style={{padding:"9px 0",borderRadius:8,border:"1px solid",borderColor:tab===t?br:"#e0ddd6",background:tab===t?bg:"#fff",color:tab===t?col:"#888",fontWeight:tab===t?600:400,fontSize:13}}>
             {label}
           </button>
         ))}
@@ -359,7 +391,7 @@ function CajeroView({onLogout,session}){
             </button>
           </>
         )}
-        {msg&&<div style={{marginTop:12,padding:"8px 12px",borderRadius:8,background:msg.ok?"#EAF3DE":"#FCEBEB",color:msg.ok?"#173404":"#501313",fontSize:14,fontWeight:500}}>{msg.text}</div>}
+        {tab!=="nuevo"&&msg&&<div style={{marginTop:12,padding:"8px 12px",borderRadius:8,background:msg.ok?"#EAF3DE":"#FCEBEB",color:msg.ok?"#173404":"#501313",fontSize:14,fontWeight:500}}>{msg.text}</div>}
       </div>
 
       {movs&&(movs.ops?.length>0||movs.canjes?.length>0)&&(
