@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Rio Nea — Casino & Club de Puntos</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --gold:#C9A84C;
+    --gold-light:#E8C97A;
+    --gold-dark:#9A7A2E;
+    --green:#1A3D2B;
+    --green-mid:#245436;
+    --green-light:#2E6B44;
+    --cream:#F5F0E8;
+    --text:#1A1A1A;
+    --white:#FFFFFF;
+  }
+  html{scroll-behavior:smooth}
+  body{font-family:'Inter',sans-serif;background:#0D1F16;color:var(--white);overflow-x:hidden}
+
+  nav{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;justify-content:space-between;align-items:center;padding:1.1rem 3rem;background:rgba(13,31,22,0.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(201,168,76,0.15)}
+  .nav-logo{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:700;color:var(--gold);letter-spacing:3px;text-transform:uppercase}
+  .nav-logo span{color:var(--white)}
+  .nav-links{display:flex;gap:2rem;align-items:center}
+  .nav-links a{color:rgba(255,255,255,0.7);text-decoration:none;font-size:.85rem;letter-spacing:1px;text-transform:uppercase;transition:color .3s}
+  .nav-links a:hover{color:var(--gold)}
+  .nav-cta{background:var(--gold);color:var(--green);padding:.55rem 1.4rem;border-radius:2px;font-weight:600;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;text-decoration:none;transition:background .3s}
+  .nav-cta:hover{background:var(--gold-light);color:var(--green)}
+
+  .hero{min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;position:relative;padding:6rem 2rem 4rem;overflow:hidden}
+  .hero-bg{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at 50% 40%,rgba(46,107,68,.35) 0%,rgba(13,31,22,0) 70%),linear-gradient(180deg,#0D1F16 0%,#0F2A1A 50%,#0D1F16 100%)}
+  .hero-lines{position:absolute;inset:0;background-image:repeating-linear-gradient(90deg,rgba(201,168,76,.04) 0px,rgba(201,168,76,.04) 1px,transparent 1px,transparent 80px),repeating-linear-gradient(0deg,rgba(201,168,76,.04) 0px,rgba(201,168,76,.04) 1px,transparent 1px,transparent 80px)}
+  .hero-badge{display:inline-block;border:1px solid rgba(201,168,76,.4);color:var(--gold);font-size:.72rem;letter-spacing:3px;text-transform:uppercase;padding:.4rem 1.2rem;border-radius:2px;margin-bottom:2rem;position:relative;z-index:1}
+  .hero h1{font-family:'Cormorant Garamond',serif;font-size:clamp(4rem,12vw,9rem);font-weight:700;line-height:.9;letter-spacing:6px;text-transform:uppercase;position:relative;z-index:1}
+  .hero h1 .line1{display:block;color:var(--white)}
+  .hero h1 .line2{display:block;color:var(--gold);text-shadow:0 0 60px rgba(201,168,76,.5)}
+  .hero-sub{font-size:1rem;color:rgba(255,255,255,.55);letter-spacing:2px;text-transform:uppercase;margin:1.5rem 0 2.5rem;position:relative;z-index:1}
+  .hero-divider{width:60px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:.8rem auto}
+  .hero-btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;position:relative;z-index:1}
+  .btn-primary{background:var(--gold);color:var(--green);padding:.85rem 2.2rem;font-weight:600;font-size:.88rem;letter-spacing:1.5px;text-transform:uppercase;border:none;cursor:pointer;border-radius:2px;text-decoration:none;transition:all .3s}
+  .btn-primary:hover{background:var(--gold-light);transform:translateY(-2px);box-shadow:0 8px 30px rgba(201,168,76,.3)}
+  .btn-secondary{background:transparent;color:var(--gold);padding:.85rem 2.2rem;font-weight:500;font-size:.88rem;letter-spacing:1.5px;text-transform:uppercase;border:1px solid rgba(201,168,76,.5);cursor:pointer;border-radius:2px;text-decoration:none;transition:all .3s}
+  .btn-secondary:hover{border-color:var(--gold);background:rgba(201,168,76,.08);transform:translateY(-2px)}
+  .scroll-hint{position:absolute;bottom:2.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.4rem;color:rgba(255,255,255,.3);font-size:.7rem;letter-spacing:2px;text-transform:uppercase}
+  .scroll-arrow{width:1px;height:40px;background:linear-gradient(180deg,rgba(201,168,76,.6),transparent);animation:scrollPulse 2s infinite}
+  @keyframes scrollPulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+  section{padding:5rem 2rem}
+  .container{max-width:1100px;margin:0 auto}
+  .section-label{font-size:.7rem;letter-spacing:4px;text-transform:uppercase;color:var(--gold);margin-bottom:1rem}
+  .section-title{font-family:'Cormorant Garamond',serif;font-size:clamp(2.2rem,5vw,3.5rem);font-weight:600;line-height:1.1;margin-bottom:1rem}
+  .section-title em{font-style:normal;color:var(--gold)}
+  .gold-line{width:50px;height:2px;background:var(--gold);margin:1.5rem 0}
+
+  .how{background:#0A1A10}
+  .how-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:1.5rem;margin-top:3rem}
+  .how-card{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.12);border-radius:4px;padding:2rem 1.5rem;transition:border-color .3s,transform .3s}
+  .how-card:hover{border-color:rgba(201,168,76,.4);transform:translateY(-4px)}
+  .how-num{font-family:'Cormorant Garamond',serif;font-size:3.5rem;font-weight:700;color:rgba(201,168,76,.15);line-height:1;margin-bottom:.75rem}
+  .how-card h3{font-size:1rem;font-weight:600;color:var(--white);margin-bottom:.5rem}
+  .how-card p{font-size:.85rem;color:rgba(255,255,255,.5);line-height:1.6}
+  .how-card .accent{color:var(--gold);font-weight:600}
+
+  .levels{background:#0D1F16}
+  .levels-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:3rem}
+  .level-card{border-radius:4px;padding:2.5rem 2rem;position:relative;overflow:hidden;transition:transform .3s}
+  .level-card:hover{transform:translateY(-6px)}
+  .level-card.inicial{background:linear-gradient(135deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.1)}
+  .level-card.pro{background:linear-gradient(135deg,rgba(24,95,165,.2),rgba(24,95,165,.08));border:1px solid rgba(24,95,165,.4)}
+  .level-card.vip{background:linear-gradient(135deg,rgba(201,168,76,.18),rgba(201,168,76,.06));border:1px solid rgba(201,168,76,.4)}
+  .level-icon{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.4rem;margin-bottom:1.2rem}
+  .inicial .level-icon{background:rgba(255,255,255,.08)}
+  .pro .level-icon{background:rgba(24,95,165,.25)}
+  .vip .level-icon{background:rgba(201,168,76,.2)}
+  .level-card h3{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:700;margin-bottom:.3rem}
+  .inicial h3{color:rgba(255,255,255,.8)}
+  .pro h3{color:#6EB3F5}
+  .vip h3{color:var(--gold)}
+  .level-range{font-size:.75rem;color:rgba(255,255,255,.4);letter-spacing:1px;margin-bottom:1.2rem}
+  .level-bonus{font-size:2.2rem;font-weight:700;margin-bottom:.3rem}
+  .inicial .level-bonus{color:rgba(255,255,255,.7)}
+  .pro .level-bonus{color:#6EB3F5}
+  .vip .level-bonus{color:var(--gold)}
+  .level-bonus-label{font-size:.75rem;color:rgba(255,255,255,.45);letter-spacing:1px;text-transform:uppercase;margin-bottom:1.4rem}
+  .level-perks{list-style:none;display:flex;flex-direction:column;gap:.5rem}
+  .level-perks li{font-size:.82rem;color:rgba(255,255,255,.55);display:flex;align-items:center;gap:.6rem}
+  .level-perks li::before{content:'—';color:var(--gold);opacity:.5}
+  .vip-crown{position:absolute;top:1rem;right:1rem;font-size:.65rem;letter-spacing:2px;text-transform:uppercase;color:var(--gold);border:1px solid rgba(201,168,76,.4);padding:.2rem .6rem;border-radius:2px}
+
+  .access{background:#0A1A10}
+  .access-grid{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center;margin-top:3rem}
+  .access-info p{font-size:.95rem;color:rgba(255,255,255,.55);line-height:1.8;margin-bottom:1rem}
+  .access-info .stat{display:flex;align-items:baseline;gap:.5rem;margin:1.5rem 0}
+  .access-info .stat-num{font-family:'Cormorant Garamond',serif;font-size:3rem;font-weight:700;color:var(--gold)}
+  .access-info .stat-label{font-size:.8rem;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px}
+  .login-box{background:rgba(255,255,255,.03);border:1px solid rgba(201,168,76,.2);border-radius:6px;padding:2.5rem;backdrop-filter:blur(10px)}
+  .login-tabs{display:grid;grid-template-columns:1fr 1fr;margin-bottom:2rem;border:1px solid rgba(201,168,76,.2);border-radius:4px;overflow:hidden}
+  .login-tab{padding:.7rem;text-align:center;font-size:.8rem;letter-spacing:1px;text-transform:uppercase;cursor:pointer;transition:all .3s;color:rgba(255,255,255,.4);background:transparent;border:none;font-family:'Inter',sans-serif}
+  .login-tab.active{background:var(--gold);color:var(--green);font-weight:600}
+  .login-form{display:flex;flex-direction:column;gap:1rem}
+  .login-form label{font-size:.75rem;letter-spacing:1px;text-transform:uppercase;color:rgba(255,255,255,.4);display:block;margin-bottom:.35rem}
+  .login-form input{width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:3px;padding:.75rem 1rem;color:var(--white);font-size:.9rem;font-family:'Inter',sans-serif;outline:none;transition:border-color .3s}
+  .login-form input:focus{border-color:rgba(201,168,76,.5)}
+  .login-form input::placeholder{color:rgba(255,255,255,.2)}
+  .login-submit{background:var(--gold);color:var(--green);border:none;padding:.85rem;font-weight:700;font-size:.85rem;letter-spacing:2px;text-transform:uppercase;cursor:pointer;border-radius:3px;transition:all .3s;margin-top:.5rem;font-family:'Inter',sans-serif}
+  .login-submit:hover{background:var(--gold-light);transform:translateY(-1px)}
+  .login-hint{font-size:.72rem;color:rgba(255,255,255,.25);text-align:center;margin-top:.75rem}
+
+  footer{background:#060F09;border-top:1px solid rgba(201,168,76,.1);padding:3rem 2rem}
+  .footer-inner{max-width:1100px;margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:2rem}
+  .footer-logo{font-family:'Cormorant Garamond',serif;font-size:1.8rem;font-weight:700;color:var(--gold);letter-spacing:4px;text-transform:uppercase}
+  .footer-copy{font-size:.75rem;color:rgba(255,255,255,.25);letter-spacing:1px}
+  .footer-tagline{font-size:.75rem;color:rgba(255,255,255,.3);text-align:right;letter-spacing:1px}
+
+  @media(max-width:768px){
+    nav{padding:1rem 1.5rem}
+    .nav-links{display:none}
+    .levels-grid{grid-template-columns:1fr}
+    .access-grid{grid-template-columns:1fr}
+    .access-info{display:none}
+  }
+
+  .toast{position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(100px);background:var(--green);border:1px solid rgba(201,168,76,.4);color:var(--white);padding:.8rem 2rem;border-radius:4px;font-size:.85rem;z-index:999;transition:transform .4s;pointer-events:none}
+  .toast.show{transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">Rio <span>Nea</span></div>
+  <div class="nav-links">
+    <a href="#como-funciona">Cómo funciona</a>
+    <a href="#niveles">Niveles</a>
+    <a href="#acceso">Mi cuenta</a>
+    <a href="#acceso" class="nav-cta">Ingresar</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-lines"></div>
+  <div class="hero-badge">Casino & Club de Beneficios</div>
+  <h1>
+    <span class="line1">Rio</span>
+    <span class="line2">Nea</span>
+  </h1>
+  <div class="hero-divider"></div>
+  <p class="hero-sub">Jugá. Acumulá. Disfrutá.</p>
+  <div class="hero-btns">
+    <a href="#acceso" class="btn-primary">Acceder al sistema</a>
+    <a href="#como-funciona" class="btn-secondary">Ver beneficios</a>
+  </div>
+  <div class="scroll-hint">
+    <div class="scroll-arrow"></div>
+    Scroll
+  </div>
+</section>
+
+<section class="how" id="como-funciona">
+  <div class="container">
+    <div class="section-label">Sistema de recompensas</div>
+    <h2 class="section-title">Cómo <em>funciona</em></h2>
+    <div class="gold-line"></div>
+    <div class="how-grid">
+      <div class="how-card">
+        <div class="how-num">01</div>
+        <h3>Cargá dinero</h3>
+        <p>Cada <span class="accent">$1.000</span> que cargás genera 1 punto automáticamente en tu cuenta.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">02</div>
+        <h3>Recibí bonificación</h3>
+        <p>Según tu nivel recibís hasta un <span class="accent">15% extra en fichas</span> sobre cada carga, sin costo.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">03</div>
+        <h3>Acumulá puntos</h3>
+        <p>Tus puntos acumulados determinan tu nivel y <span class="accent">desbloquean beneficios</span> exclusivos.</p>
+      </div>
+      <div class="how-card">
+        <div class="how-num">04</div>
+        <h3>Canjeá por fichas</h3>
+        <p>Cada punto vale <span class="accent">$100 en fichas</span>. Canjeás cuando quieras, sin vencimiento.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="levels" id="niveles">
+  <div class="container">
+    <div class="section-label">Categorías de jugador</div>
+    <h2 class="section-title">Tus <em>niveles</em></h2>
+    <div class="gold-line"></div>
+    <div class="levels-grid">
+      <div class="level-card inicial">
+        <div class="level-icon">⬡</div>
+        <h3>Inicial</h3>
+        <div class="level-range">0 — 499 puntos</div>
+        <div class="level-bonus">5%</div>
+        <div class="level-bonus-label">Bonificación en fichas</div>
+        <ul class="level-perks">
+          <li>1 punto cada $1.000 cargados</li>
+          <li>$100 en fichas por punto canjeado</li>
+          <li>Historial de movimientos</li>
+        </ul>
+      </div>
+      <div class="level-card pro">
+        <div class="level-icon">◈</div>
+        <h3>Pro</h3>
+        <div class="level-range">500 — 1.999 puntos</div>
+        <div class="level-bonus">10%</div>
+        <div class="level-bonus-label">Bonificación en fichas</div>
+        <ul class="level-perks">
+          <li>Todo lo del nivel Inicial</li>
+          <li>Bonificación duplicada</li>
+          <li>Acceso prioritario</li>
+        </ul>
+      </div>
+      <div class="level-card vip">
+        <div class="vip-crown">VIP</div>
+        <div class="level-icon">♛</div>
+        <h3>VIP</h3>
+        <div class="level-range">2.000+ puntos</div>
+        <div class="level-bonus">15%</div>
+        <div class="level-bonus-label">Bonificación en fichas</div>
+        <ul class="level-perks">
+          <li>Todo lo del nivel Pro</li>
+          <li>Máxima bonificación</li>
+          <li>Beneficios exclusivos</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="access" id="acceso">
+  <div class="container">
+    <div class="access-grid">
+      <div class="access-info">
+        <div class="section-label">Acceso al sistema</div>
+        <h2 class="section-title">Tu cuenta, <em>siempre</em> disponible</h2>
+        <div class="gold-line"></div>
+        <p>Ingresá con tu usuario para ver tus puntos, tu nivel actual, historial de movimientos y canjear cuando quieras.</p>
+        <p>El personal de caja accede con su usuario y PIN para gestionar cargas y canjes.</p>
+        <div class="stat">
+          <span class="stat-num">1</span>
+          <span class="stat-label">punto = $100 en fichas</span>
+        </div>
+      </div>
+      <div class="login-box">
+        <div class="login-tabs">
+          <button class="login-tab active" id="tab-jugador" onclick="switchTab('jugador')">Jugador</button>
+          <button class="login-tab" id="tab-cajero" onclick="switchTab('cajero')">Cajero / Admin</button>
+        </div>
+        <div id="form-jugador" class="login-form">
+          <div>
+            <label>Nombre de usuario</label>
+            <input type="text" id="input-user" placeholder="ej: carlosm" autocomplete="off"/>
+          </div>
+          <button class="login-submit" onclick="loginJugador()">Ingresar al sistema</button>
+          <div class="login-hint">Ingresá tu usuario para ver tus puntos y beneficios</div>
+        </div>
+        <div id="form-cajero" class="login-form" style="display:none">
+          <div>
+            <label>Usuario</label>
+            <input type="text" id="input-cajero-nombre" placeholder="ej: cajero1" autocomplete="off"/>
+          </div>
+          <div>
+            <label>PIN de acceso</label>
+            <input type="password" id="input-pin" placeholder="••••"/>
+          </div>
+          <button class="login-submit" onclick="loginCajero()">Acceder al panel</button>
+          <div class="login-hint">Acceso exclusivo para personal autorizado</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">Rio Nea</div>
+    <div class="footer-copy">© 2025 Rio Nea · Corrientes, Argentina</div>
+    <div class="footer-tagline">Casino & Club de Beneficios</div>
+  </div>
+</footer>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SUPA_URL = "https://grtmfhlcsfmvzmtrxugg.supabase.co";
+  const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydG1maGxjc2ZtdnptdHJ4dWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTg2MzgsImV4cCI6MjA5MDAzNDYzOH0.BInOLC0LRPGNRF4QqrExDwRbbJQZOHNtg3pFnq-hXdU";
+
+  function switchTab(t) {
+    document.getElementById('tab-jugador').classList.toggle('active', t === 'jugador');
+    document.getElementById('tab-cajero').classList.toggle('active', t === 'cajero');
+    document.getElementById('form-jugador').style.display = t === 'jugador' ? 'flex' : 'none';
+    document.getElementById('form-cajero').style.display = t === 'cajero' ? 'flex' : 'none';
+  }
+
+  function showToast(msg, ok = true) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = ok ? '#1A3D2B' : '#3D1A1A';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  async function loginJugador() {
+    const u = document.getElementById('input-user').value.trim().toLowerCase();
+    if (!u) { showToast('Ingresá tu usuario.', false); return; }
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/jugadores?username=eq.${encodeURIComponent(u)}&activo=eq.true&select=id,nombre`, {
+        headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+      });
+      const d = await r.json();
+      if (!d.length) { showToast('Usuario no encontrado.', false); return; }
+      showToast(`Bienvenido, ${d[0].nombre}!`);
+    } catch { showToast('Error de conexión.', false); }
+  }
+
+  async function loginCajero() {
+    const nombre = document.getElementById('input-cajero-nombre').value.trim().toLowerCase();
+    const pin = document.getElementById('input-pin').value;
+    if (!nombre) { showToast('Ingresá tu usuario.', false); return; }
+    if (!pin) { showToast('Ingresá tu PIN.', false); return; }
+    try {
+      const r = await fetch(`${SUPA_URL}/rest/v1/usuarios_sistema?username=eq.${encodeURIComponent(nombre)}&activo=eq.true&select=nombre,pin,rol`, {
+        headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+      });
+      const d = await r.json();
+      if (!d.length) { showToast('Usuario no encontrado.', false); return; }
+      if (d[0].pin !== pin) { showToast('PIN incorrecto.', false); return; }
+      showToast(`Bienvenido, ${d[0].nombre}!`);
+    } catch { showToast('Error de conexión.', false); }
+  }
+
+  window.addEventListener('scroll', () => {
+    const lines = document.querySelector('.hero-lines');
+    if (lines) lines.style.transform = `translateY(${scrollY * .15}px)`;
+  });
+</script>
+</body>
+</html>
