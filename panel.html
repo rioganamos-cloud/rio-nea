@@ -48,6 +48,8 @@ async function q(path,opts={}){
 // ── ROOT ──────────────────────────────────────────────────────
 function App(){
   const [session,setSession]=useState(null);
+  // Exponer setSession para auto-login desde URL
+  useEffect(() => { window.__autoLogin = setSession; }, [setSession]);
   return session
     ? session.role==="jugador"
       ? <JugadorView session={session} onLogout={()=>setSession(null)}/>
@@ -581,6 +583,40 @@ function JugadorView({session,onLogout}){
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+
+// Auto-login desde parámetros de URL (viene del index.html)
+window.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search);
+  const user = params.get("user");
+  const role = params.get("role");
+  if (user && role) {
+    // Disparar login automático después de que React monte
+    setTimeout(async () => {
+      try {
+        if (role === "jugador") {
+          const r = await fetch(`${SUPA_URL}/rest/v1/jugadores?username=eq.${encodeURIComponent(user)}&activo=eq.true&select=id,username,nombre`, {
+            headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+          });
+          const d = await r.json();
+          if (d.length) {
+            const pts = await fetch(`${SUPA_URL}/rest/v1/puntos_jugador?jugador_id=eq.${d[0].id}&select=puntos,fichas`, {
+              headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+            }).then(r => r.json());
+            window.__autoLogin({ role: "jugador", jugador: d[0], puntos: pts[0] || { puntos: 0, fichas: 0 } });
+          }
+        } else {
+          const r = await fetch(`${SUPA_URL}/rest/v1/usuarios_sistema?username=eq.${encodeURIComponent(user)}&activo=eq.true&select=nombre,rol`, {
+            headers: { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}` }
+          });
+          const d = await r.json();
+          if (d.length) {
+            window.__autoLogin({ role: d[0].rol === "admin" ? "admin" : "cajero", cajeroNombre: d[0].nombre });
+          }
+        }
+      } catch {}
+    }, 300);
+  }
+});
 </script>
 </body>
 </html>
