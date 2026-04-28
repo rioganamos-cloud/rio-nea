@@ -319,7 +319,8 @@
       });
       const d = await r.json();
       if (!d.length) { showToast('Usuario no encontrado.', false); return; }
-      showToast(`Bienvenido, ${d[0].nombre}!`);
+      showToast(`Bienvenido, ${d[0].nombre}! Redirigiendo...`);
+      setTimeout(() => { window.location.href = `panel.html?user=${encodeURIComponent(u)}&role=jugador`; }, 1200);
     } catch { showToast('Error de conexión.', false); }
   }
 
@@ -335,7 +336,8 @@
       const d = await r.json();
       if (!d.length) { showToast('Usuario no encontrado.', false); return; }
       if (d[0].pin !== pin) { showToast('PIN incorrecto.', false); return; }
-      showToast(`Bienvenido, ${d[0].nombre}!`);
+      showToast(`Bienvenido, ${d[0].nombre}! Redirigiendo...`);
+      setTimeout(() => { window.location.href = `panel.html?user=${encodeURIComponent(nombre)}&role=${d[0].rol}`; }, 1200);
     } catch { showToast('Error de conexión.', false); }
   }
 
