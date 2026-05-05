@@ -1,0 +1,182 @@
+[resultados-cafe.html](https://github.com/user-attachments/files/27413600/resultados-cafe.html)
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resultados · Encuesta Café</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Georgia,serif;background:#f5f2ee;min-height:100vh;padding:2rem 1rem;color:#2c1a0e}
+.container{max-width:720px;margin:0 auto}
+.header{background:#2c1a0e;border-radius:16px;padding:1.5rem 2rem;margin-bottom:1.5rem;color:#fff}
+.badge{font-size:12px;color:#c9a96e;margin-bottom:6px;letter-spacing:.05em;display:block}
+h1{font-size:22px;font-weight:700;margin-bottom:4px}
+.sub{font-size:13px;color:#d4b896}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px}
+.kpi{background:#fff;border:1px solid #e8e2da;border-radius:10px;padding:1rem;text-align:center}
+.kpi-label{font-size:11px;color:#8b6f4e;margin-bottom:6px}
+.kpi-val{font-size:26px;font-weight:700;color:#2c1a0e}
+.card{background:#fff;border:1px solid #e8e2da;border-radius:12px;padding:1.25rem;margin-bottom:12px}
+.card-titulo{font-size:11px;font-weight:700;letter-spacing:.06em;color:#8b6f4e;text-transform:uppercase;margin-bottom:14px}
+.abiertas{max-height:400px;overflow-y:auto}
+.respuesta{border-bottom:1px solid #f0ebe4;padding-bottom:14px;margin-bottom:14px}
+.respuesta:last-child{border-bottom:none;margin-bottom:0}
+.resp-etiqueta{font-size:10px;font-weight:700;color:#8b6f4e;margin-bottom:4px}
+.resp-texto{font-size:14px;color:#2c1a0e;line-height:1.6}
+.resp-fecha{font-size:10px;color:#bbb;margin-top:4px}
+.vacio{background:#fff;border-radius:12px;padding:3rem;text-align:center;color:#8b6f4e;border:1px solid #e8e2da}
+.vacio-icon{font-size:36px;margin-bottom:12px}
+.vacio h2{font-size:16px;font-weight:600;margin-bottom:8px}
+.vacio p{font-size:14px;color:#a89080}
+.update{font-size:11px;color:#c9a96e;margin-top:4px}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <span class="badge">☕ PANEL DE RESULTADOS</span>
+    <h1>Encuesta Café · Parque de la Democracia</h1>
+    <p class="sub">Resistencia, Chaco</p>
+    <p class="update" id="ultima-act">Cargando...</p>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="kpi-label">Total respuestas</div><div class="kpi-val" id="k-total">—</div></div>
+    <div class="kpi"><div class="kpi-label">Visitan 2+ veces/sem</div><div class="kpi-val" id="k-frecuentes">—</div></div>
+    <div class="kpi"><div class="kpi-label">Conocen especialidad</div><div class="kpi-val" id="k-conocen">—</div></div>
+    <div class="kpi"><div class="kpi-label">Pagarían premium</div><div class="kpi-val" id="k-premium">—</div></div>
+  </div>
+
+  <div id="contenido-vacio" class="vacio" style="display:none">
+    <div class="vacio-icon">☕</div>
+    <h2>Todavía no hay respuestas</h2>
+    <p>Compartí el link de la encuesta y los resultados aparecerán acá.</p>
+  </div>
+
+  <div id="contenido-graficos" style="display:none">
+    <div class="card"><div class="card-titulo">Frecuencia de visita al parque</div><canvas id="g-frecuencia_parque"></canvas></div>
+    <div class="card"><div class="card-titulo">Actividades en el parque</div><canvas id="g-actividades"></canvas></div>
+    <div class="card"><div class="card-titulo">Franja horaria de visita</div><canvas id="g-horario_visita"></canvas></div>
+    <div class="card"><div class="card-titulo">Frecuencia de consumo de café fuera del hogar</div><canvas id="g-frecuencia_cafe_fuera"></canvas></div>
+    <div class="card"><div class="card-titulo">Tipos de café preferidos</div><canvas id="g-tipos_cafe"></canvas></div>
+    <div class="card"><div class="card-titulo">Ticket actual en cafeterías de Resistencia</div><canvas id="g-ticket_actual"></canvas></div>
+    <div class="card"><div class="card-titulo">Conocimiento del café de especialidad</div><canvas id="g-conocimiento_especialidad"></canvas></div>
+    <div class="card"><div class="card-titulo">Disposición a pagar precio premium</div><canvas id="g-disposicion_pagar_premium"></canvas></div>
+    <div class="card"><div class="card-titulo">Uso principal que le daría al café</div><canvas id="g-uso_principal"></canvas></div>
+    <div class="card"><div class="card-titulo">Ambiente preferido</div><canvas id="g-ambiente_preferido"></canvas></div>
+    <div class="card"><div class="card-titulo">Servicios extra más deseados</div><canvas id="g-servicios_extra"></canvas></div>
+    <div class="card" id="card-abiertas" style="display:none">
+      <div class="card-titulo">Respuestas abiertas</div>
+      <div class="abiertas" id="abiertas-contenido"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const { createClient } = supabase;
+const db = createClient(
+  'https://grtmfhlcsfmvzmtrxugg.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdydG1maGxjc2ZtdnptdHJ4dWdnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0NTg2MzgsImV4cCI6MjA5MDAzNDYzOH0.BInOLC0LRPGNRF4QqrExDwRbbJQZOHNtg3pFnq-hXdU'
+);
+
+const COLORES = ['#2c1a0e','#8b6f4e','#c9a96e','#d4b896','#e8e2da','#a07850','#6b4c2a','#f0ebe4'];
+const graficos = {};
+
+function contar(data, campo) {
+  const mapa = {};
+  data.forEach(r => {
+    const v = r[campo];
+    if (!v) return;
+    const vals = Array.isArray(v) ? v : [v];
+    vals.forEach(x => { mapa[x] = (mapa[x] || 0) + 1; });
+  });
+  return Object.entries(mapa).sort((a,b) => b[1]-a[1]);
+}
+
+function dibujar(id, datos) {
+  const canvas = document.getElementById('g-' + id);
+  if (!canvas || !datos.length) return;
+  const labels = datos.map(d => d[0]);
+  const values = datos.map(d => d[1]);
+  if (graficos[id]) graficos[id].destroy();
+  graficos[id] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: COLORES.slice(0, values.length), borderRadius: 6 }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 }, color: '#8b6f4e' }, grid: { color: '#f0ebe4' } },
+        y: { ticks: { font: { size: 12 }, color: '#2c1a0e' } }
+      }
+    }
+  });
+}
+
+function pct(data, campo, valor) {
+  if (!data.length) return '—';
+  const n = data.filter(r => {
+    const v = r[campo];
+    return Array.isArray(v) ? v.includes(valor) : v === valor;
+  }).length;
+  return Math.round((n / data.length) * 100) + '%';
+}
+
+async function cargar() {
+  const { data } = await db.from('encuesta_cafe').select('*').order('created_at', { ascending: false });
+  if (!data) return;
+
+  const total = data.length;
+  document.getElementById('k-total').textContent = total;
+  document.getElementById('ultima-act').textContent = 'Última actualización: ' + new Date().toLocaleTimeString('es-AR');
+
+  if (total === 0) {
+    document.getElementById('contenido-vacio').style.display = 'block';
+    document.getElementById('contenido-graficos').style.display = 'none';
+    document.getElementById('k-frecuentes').textContent = '—';
+    document.getElementById('k-conocen').textContent = '—';
+    document.getElementById('k-premium').textContent = '—';
+    return;
+  }
+
+  document.getElementById('contenido-vacio').style.display = 'none';
+  document.getElementById('contenido-graficos').style.display = 'block';
+
+  // KPIs
+  const frec = data.filter(r => ['Todos los días o casi todos los días','2 a 3 veces por semana'].includes(r.frecuencia_parque)).length;
+  document.getElementById('k-frecuentes').textContent = Math.round(frec/total*100) + '%';
+  const conocen = data.filter(r => r.conocimiento_especialidad && r.conocimiento_especialidad.startsWith('Sí')).length;
+  document.getElementById('k-conocen').textContent = Math.round(conocen/total*100) + '%';
+  const prem = data.filter(r => ['Sí, definitivamente','Probablemente sí'].includes(r.disposicion_pagar_premium)).length;
+  document.getElementById('k-premium').textContent = Math.round(prem/total*100) + '%';
+
+  // Gráficos
+  const campos = ['frecuencia_parque','actividades','horario_visita','frecuencia_cafe_fuera','tipos_cafe','ticket_actual','conocimiento_especialidad','disposicion_pagar_premium','uso_principal','ambiente_preferido','servicios_extra'];
+  campos.forEach(c => dibujar(c, contar(data, c)));
+
+  // Respuestas abiertas
+  const abiertas = data.filter(r => r.que_valoras || r.que_falta);
+  if (abiertas.length) {
+    document.getElementById('card-abiertas').style.display = 'block';
+    document.getElementById('abiertas-contenido').innerHTML = abiertas.map(r => `
+      <div class="respuesta">
+        ${r.que_valoras ? `<div class="resp-etiqueta">¿QUÉ MÁS VALORÁS?</div><div class="resp-texto">${r.que_valoras}</div>` : ''}
+        ${r.que_falta ? `<div class="resp-etiqueta" style="margin-top:${r.que_valoras?'10px':'0'}">¿QUÉ FALTA EN RESISTENCIA?</div><div class="resp-texto">${r.que_falta}</div>` : ''}
+        <div class="resp-fecha">${new Date(r.created_at).toLocaleString('es-AR')}</div>
+      </div>
+    `).join('');
+  }
+}
+
+cargar();
+setInterval(cargar, 30000);
+</script>
+</body>
+</html>
